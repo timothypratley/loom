@@ -1,4 +1,4 @@
-(defproject aysylu/loom "1.0.2-SNAPSHOT"
+(defproject aysylu/loom "1.1.0-SNAPSHOT"
   :min-lein-version "2.0.0"
   :description "Graph library for Clojure"
   :license {:name "Eclipse Public License"
@@ -10,7 +10,7 @@
   :test-selectors {:default (fn [m] (not (:test-check-slow m)))
                    :all (constantly true)
                    :test-check-slow :test-check-slow}
-  
+
   :profiles {:dev [:cljs
                    {:dependencies [[org.clojure/test.check "0.9.0"]]
                     :plugins [[com.jakemccrary/lein-test-refresh "0.15.0"]]
@@ -36,7 +36,7 @@
                                              :pretty-print false
                                              :target :nodejs
                                              :main loom.test.runner}}}}}}
-  
+
   :aliases {"test-all" ["do" "clean," "test" ":all," "cljs-test"]
             "cljs-test" ["doo" "node" "node-test" "once"]
             "release" ["do" "clean," "with-profile" "default" "deploy" "clojars"]}

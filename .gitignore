@@ -7,3 +7,5 @@ classes
 /.lein-*
 .nrepl-port
 out
+/.idea
+loom.iml
