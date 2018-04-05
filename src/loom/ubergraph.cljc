@@ -1,7 +1,6 @@
 (ns loom.ubergraph
   (:require [loom.graph :as lg]
             [loom.attr :as la]
-            ;;[dorothy.core :as d]
             [clojure.string :as str]
             [clojure.pprint]))
 
@@ -183,7 +182,7 @@ using path-between"
   Attrs
   (add-attrs [g node-or-edge attribute-map]
     (update-in g [:attrs (resolve-node-or-edge g node-or-edge)]
-              merge attribute-map))
+               merge attribute-map))
   (add-attrs [g n1 n2 attribute-map]
     (add-attrs g (get-edge g n1 n2) attribute-map))
   (set-attrs [g node-or-edge attribute-map]
@@ -200,10 +199,10 @@ using path-between"
 
   UndirectedGraph
   (other-direction [g edge]
-   (when (undirected-edge? edge)
-     (let [edge (edge-description->edge g edge),
-           e (assoc edge :src (:dest edge) :dest (:src edge) :mirror? (not (:mirror? edge)))]
-       e)))
+    (when (undirected-edge? edge)
+      (let [edge (edge-description->edge g edge),
+            e (assoc edge :src (:dest edge) :dest (:src edge) :mirror? (not (:mirror? edge)))]
+        e)))
 
   QueryableGraph
   (find-edges [g edge-query] (find-edges-impl g edge-query))
@@ -220,32 +219,44 @@ using path-between"
   IUbergraph
   (ubergraph? [g] true)
 
-  #_IMap
-  #_(get [this key default-value]
-         (case key
-           :node-map node-map
-           :allow-parallel? allow-parallel?
-           :undirected? undirected?
-           :attrs attrs
-           :cached-hash cached-hash
-           default-value))
+  ;; get
+  clojure.lang.ILookup
+  ;; TODO:
+  (valAt [this key])
+  (valAt [this key default-value]
+    (case key
+      :node-map node-map
+      :allow-parallel? allow-parallel?
+      :undirected? undirected?
+      :attrs attrs
+      :cached-hash cached-hash
+      default-value))
 
-  #_(assoc [this key value]
-           (case key
-             :node-map (Ubergraph. value allow-parallel? undirected? attrs cached-hash)
-             :allow-parallel? (Ubergraph. node-map value undirected? attrs cached-hash)
-             :undirected? (Ubergraph. node-map allow-parallel? value attrs cached-hash)
-             :attrs (Ubergraph. node-map allow-parallel? undirected? value cached-hash)
-             :cached-hash (Ubergraph. node-map allow-parallel? undirected? attrs value)
-             this))
-  #_(dissoc [this key] this)
-  #_(keys [this] [:node-map :allow-parallel? :undirected? :attrs :cached-hash])
-  #_(meta [this] nil)
-  #_(with-meta [this meta] this)
+  clojure.lang.IPersistentMap
+  (assoc [this key value]
+    (case key
+      :node-map (Ubergraph. value allow-parallel? undirected? attrs cached-hash)
+      :allow-parallel? (Ubergraph. node-map value undirected? attrs cached-hash)
+      :undirected? (Ubergraph. node-map allow-parallel? value attrs cached-hash)
+      :attrs (Ubergraph. node-map allow-parallel? undirected? value cached-hash)
+      :cached-hash (Ubergraph. node-map allow-parallel? undirected? attrs value)
+      this))
+  ;;dissoc
+  ;; TODO:
+  (without [this key] this)
+  ;; TODO:
+  ;;(hasheq [this] (hash-graph this))
+  (equiv [this other] (and (instance? Ubergraph other)
+                           (equal-graphs? this other)))
 
-  #_(hasheq [this] (hash-graph this))
-  #_(equiv [this other] (and (instance? Ubergraph other)
-                             (equal-graphs? this other))))
+
+  java.util.Map
+  (keySet [this] [:node-map :allow-parallel? :undirected? :attrs :cached-hash])
+
+  clojure.lang.IObj
+  (meta [this] nil)
+  (withMeta [this meta] this))
+
 
 (defn undirected-graph? "If true, new edges in g are undirected by default.  If false,
 new edges in g are directed by default."
