@@ -136,26 +136,21 @@ using path-between"
                (with-meta edge g)))
   (has-node? [g node] (boolean (get-in g [:node-map node])))
   (has-edge? [g n1 n2] (boolean (seq (find-edges g n1 n2))))
-  ;;(successors [g] (partial lg/successors g))
-  ;;(successors [g node] (distinct (map lg/dest (lg/out-edges g node))))
+  (successors* [g node] (distinct (map lg/dest (lg/out-edges g node))))
   (out-degree [g node] (get-in g [:node-map node :out-degree]))
-  ;(out-edges [g] (partial out-edges g))
   (out-edges [g node] (map #(with-meta % g) (apply concat (vals (get-in g [:node-map node :out-edges])))))
 
   lg/Digraph
-  ;;(predecessors [g] (partial lg/predecessors g))
-  ;;(predecessors [g node] (map lg/src (lg/in-edges g node)))
+  (predecessors* [g node] (map lg/src (lg/in-edges g node)))
   (in-degree [g node] (get-in g [:node-map node :in-degree]))
-  ;(in-edges [g] (partial in-edges g))
   (in-edges [g node] (map #(with-meta % g) (apply concat (vals (get-in g [:node-map node :in-edges])))))
   (transpose [g] (transpose-impl g))
 
   lg/WeightedGraph
   ; Ubergraphs by default store weight in an attribute :weight
   ; Using an attribute allows us to modify the weight with the AttrGraph protocol
-  ;;(weight [g] (partial lg/weight g))
-  ;;(weight [g e] (get-in g [:attrs (:id (edge-description->edge g e)) :weight] 1))
-  ;;(weight [g n1 n2] (get-in g [:attrs (:id (get-edge g n1 n2)) :weight] 1))
+  (weight* [g e] (get-in g [:attrs (:id (edge-description->edge g e)) :weight] 1))
+  (weight* [g n1 n2] (get-in g [:attrs (:id (get-edge g n1 n2)) :weight] 1))
 
   lg/EditableGraph
   (add-nodes* [g nodes] (reduce add-node g nodes))
@@ -221,8 +216,14 @@ using path-between"
 
   ;; get
   clojure.lang.ILookup
-  ;; TODO:
-  (valAt [this key])
+  (valAt [this key]
+    (case key
+      :node-map node-map
+      :allow-parallel? allow-parallel?
+      :undirected? undirected?
+      :attrs attrs
+      :cached-hash cached-hash
+      nil))
   (valAt [this key default-value]
     (case key
       :node-map node-map
@@ -233,6 +234,7 @@ using path-between"
       default-value))
 
   clojure.lang.IPersistentMap
+  (count [this] 5)
   (assoc [this key value]
     (case key
       :node-map (Ubergraph. value allow-parallel? undirected? attrs cached-hash)
@@ -241,6 +243,15 @@ using path-between"
       :attrs (Ubergraph. node-map allow-parallel? undirected? value cached-hash)
       :cached-hash (Ubergraph. node-map allow-parallel? undirected? attrs value)
       this))
+  (containsKey [this item]
+    (contains? #{:node-map :allow-parallel? :undirected? :attrs :cached-hash} item))
+  (seq [this]
+    (seq {:node-map node-map
+          :allow-parallel? allow-parallel?
+          :undirected? undirected?
+          :attrs attrs
+          :cached-hash cached-hash}))
+
   ;;dissoc
   ;; TODO:
   (without [this key] this)
@@ -401,6 +412,7 @@ will `upgrade' the directed edge to undirected and merge attributes."
                             (update-in [:in-edges src] fconj edge)
                             (update-in [:in-degree] finc))
         new-node-map (assoc node-map src new-node-map-src dest new-node-map-dest)]
+    (prn "ADDE" new-node-map)
     (Ubergraph. new-node-map (:allow-parallel? g) (:undirected? g) new-attrs (atom -1))))
 
 (defn- add-undirected-edge [g src dest attributes]
@@ -441,8 +453,11 @@ will `upgrade' the directed edge to undirected and merge attributes."
                    merge attributes)
         g)
 
-      (:undirected? g) (add-undirected-edge g src dest attributes)
-      :else (add-directed-edge g src dest attributes))))
+      (:undirected? g)
+      (add-undirected-edge g src dest attributes)
+
+      :else
+      (add-directed-edge g src dest attributes))))
 
 (defn- force-add-directed-edge
   [g [src dest attributes]]
@@ -568,76 +583,77 @@ it is an edge."
 (defn- nodes-with-attrs [g]
   (for [n (lg/nodes g)] [n (la/attrs g n)]))
 
+(defn- build [g init]
+  (cond
+    ;; ubergraph
+    (instance? Ubergraph init)
+    (let [new-g (add-nodes-with-attrs* g (nodes-with-attrs init)),
+          directed-edges (for [e (lg/edges init)
+                               :when (directed-edge? e)]
+                           [(lg/src e) (lg/dest e) (la/attrs init e)])
+          undirected-edges (for [e (lg/edges init),
+                                 :when (and (undirected-edge? e)
+                                            (not (mirror-edge? e)))]
+                             [(lg/src e) (lg/dest e) (la/attrs init e)])
+          new-g (add-directed-edges* new-g directed-edges)
+          new-g (add-undirected-edges* new-g undirected-edges)]
+      new-g)
+
+    ;; Edge objects
+    (directed-edge? init)
+    (-> g
+        (lg/add-nodes (lg/src init) (lg/dest init)),
+        (add-directed-edges [(lg/src init) (lg/dest init)
+                             (la/attrs (meta init) init)]))
+
+    (undirected-edge? init)
+    (-> g
+        (lg/add-nodes (lg/src init) (lg/dest init))
+        (add-undirected-edges [(lg/src init) (lg/dest init)
+                               (la/attrs (meta init) init)]))
+
+    ;; Marked as a node
+    (:node (meta init))
+    (add-node g init)
+
+    ;; Marked as an edge
+    (:edge (meta init))
+    (let [[src dest n] init]
+      (add-edge g [src dest (number->map n)]))
+
+    ;; Adjacency map
+    (map? init)
+    (let [es (if (map? (val (first init)))
+               (for [[n nbrs] init
+                     [nbr wt] nbrs]
+                 [n nbr wt])
+               (for [[n nbrs] init
+                     nbr nbrs]
+                 [n nbr]))]
+      (-> g
+          (lg/add-nodes* (keys init))
+          (lg/add-edges* es)))
+
+    ;; node-with-attributes
+    (and (vector? init) (= 2 (count init)) (map? (init 1)))
+    (add-node-with-attrs g [(init 0) (init 1)])
+
+    ;; edge description
+    (and (vector? init) (#{2,3} (count init)))
+    (add-edge g [(init 0) (init 1) (number->map (get init 2))])
+
+    ;; node
+    :else (add-node g init)))
+
 (defn build-graph
   "Builds graphs using node descriptions of the form node-label or [node-label attribute-map]
-and edge descriptions of the form [src dest], [src dest weight], or [src dest attribute-map].
-Also can build from other ubergraphs, ubergraph edge objects, and from adjacency maps.
+  and edge descriptions of the form [src dest], [src dest weight], or [src dest attribute-map].
+  Also can build from other ubergraphs, ubergraph edge objects, and from adjacency maps.
 
-Use ^:node and ^:edge metadata to resolve ambiguous inits, or build your graph with the more
-precise add-nodes, add-nodes-with-attrs, and add-edges functions."
+  Use ^:node and ^:edge metadata to resolve ambiguous inits, or build your graph with the more
+  precise add-nodes, add-nodes-with-attrs, and add-edges functions."
   [g & inits]
-  (letfn [(build [g init]
-            (cond
-              ;; ubergraph
-              (instance? Ubergraph init)
-              (let [new-g (add-nodes-with-attrs* g (nodes-with-attrs init)),
-                    directed-edges (for [e (lg/edges init)
-                                         :when (directed-edge? e)]
-                                     [(lg/src e) (lg/dest e) (la/attrs init e)])
-                    undirected-edges (for [e (lg/edges init),
-                                           :when (and (undirected-edge? e)
-                                                      (not (mirror-edge? e)))]
-                                       [(lg/src e) (lg/dest e) (la/attrs init e)])
-                    new-g (add-directed-edges* new-g directed-edges)
-                    new-g (add-undirected-edges* new-g undirected-edges)]
-                new-g)
-
-              ;; Edge objects
-              (directed-edge? init)
-              (let [new-g (lg/add-nodes g (lg/src init) (lg/dest init)),
-                    new-g (add-directed-edges g [(lg/src init) (lg/dest init)
-                                                 (la/attrs (meta init) init)])]
-                new-g)
-
-              (undirected-edge? init)
-              (let [new-g (lg/add-nodes g (lg/src init) (lg/dest init)),
-                    new-g (add-undirected-edges g [(lg/src init) (lg/dest init)
-                                                   (la/attrs (meta init) init)])]
-                new-g)
-
-              ;; Marked as a node
-              (:node (meta init))
-              (add-node g init)
-
-              ;; Marked as an edge
-              (:edge (meta init))
-              (let [[src dest n] init]
-                (add-edge g [src dest (number->map n)]))
-
-              ;; Adjacency map
-              (map? init)
-              (let [es (if (map? (val (first init)))
-                         (for [[n nbrs] init
-                               [nbr wt] nbrs]
-                           [n nbr wt])
-                         (for [[n nbrs] init
-                               nbr nbrs]
-                           [n nbr]))]
-                (-> g
-                  (lg/add-nodes* (keys init))
-                  (lg/add-edges* es)))
-
-              ;; node-with-attributes
-              (and (vector? init) (= 2 (count init)) (map? (init 1)))
-              (add-node-with-attrs g [(init 0) (init 1)])
-
-              ;; edge description
-              (and (vector? init) (#{2,3} (count init)))
-              (add-edge g [(init 0) (init 1) (number->map (get init 2))])
-
-              ;; node
-              :else (add-node g init)))]
-    (reduce build g (strip-equal-id-edges inits))))
+  (reduce build g (strip-equal-id-edges inits)))
 
 ;; All of these graph options can also serve as weighted graphs, just initialize accordingly.
 
