@@ -34,10 +34,10 @@
        (la/add-attr graph1 :a :b :weight 3)
        (uber/graph [:a :b 3] [:a :c] [:b :d])
 
-       (uber/remove-edges graph1 [:b :d])
+       (lg/remove-edges graph1 [:b :d])
        (uber/graph [:a :b] [:a :c] :d)
 
-       (uber/remove-edges graph1 [:d :b])
+       (lg/remove-edges graph1 [:d :b])
        (uber/graph [:a :b] [:a :c] :d)
 
        (uber/graph [:a {:counter 1}])

@@ -9,15 +9,8 @@
                      has-node? has-edge? add-nodes add-edges transpose
                      remove-nodes remove-edges predecessors weight in-degree]]))
 
-(deftest t
-  (is (doto (multigraph [1 2] [1 3])
-        (-> (edges) (prn 'EDGES))
-        (-> (nodes) (prn 'NODES)))))
-
 (defn vec-edges [g]
   (for [e (edges g) :when (not (mirror-edge? e))] [(src e) (dest e)]))
-
-;; why is this broken? doesn't seem to test ubergraph at all?
 
 (deftest simple-graph-test
   (let [g1 (graph [1 2] [1 3] [2 3] 4)

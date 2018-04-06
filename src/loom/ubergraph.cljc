@@ -124,7 +124,7 @@ using path-between"
 ; in the Ubergraph record.
 (declare transpose-impl get-edge find-edges-impl find-edge-impl add-node add-edge remove-node remove-edge
          edge-description->edge resolve-node-or-edge
-         force-add-directed-edge force-add-undirected-edge remove-edges
+         force-add-directed-edge force-add-undirected-edge
          equal-graphs? hash-graph)
 
 (deftype Ubergraph [node-map allow-parallel? undirected? attrs cached-hash]
@@ -412,7 +412,6 @@ will `upgrade' the directed edge to undirected and merge attributes."
                             (update-in [:in-edges src] fconj edge)
                             (update-in [:in-degree] finc))
         new-node-map (assoc node-map src new-node-map-src dest new-node-map-dest)]
-    (prn "ADDE" new-node-map)
     (Ubergraph. new-node-map (:allow-parallel? g) (:undirected? g) new-attrs (atom -1))))
 
 (defn- add-undirected-edge [g src dest attributes]
@@ -478,7 +477,7 @@ will `upgrade' the directed edge to undirected and merge attributes."
                                        (get-edge g dest src)))
       (let [new-attrs (merge (la/attrs g src dest) (la/attrs g dest src) attributes)]
         (-> g
-          (remove-edges [src dest] [dest src])
+          (lg/remove-edges* [[src dest] [dest src]])
           (add-undirected-edge src dest attributes)))
       :else (add-undirected-edge g src dest attributes))))
 
