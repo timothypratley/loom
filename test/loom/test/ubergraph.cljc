@@ -1,12 +1,12 @@
 (ns loom.test.ubergraph
   (:require [clojure.test :refer :all]
             [loom.ubergraph
-             :refer [mirror-edge? multigraph multidigraph ubergraph
+             :refer [mirror-edge? graph digraph multigraph multidigraph ubergraph
                      find-edges add-directed-edges
                      allow-parallel-edges? undirected-graph?]]
             [loom.graph
-             :refer [graph edges nodes src dest successors out-degree
-                     digraph has-node? has-edge? add-nodes add-edges transpose
+             :refer [edges nodes src dest successors out-degree
+                     has-node? has-edge? add-nodes add-edges transpose
                      remove-nodes remove-edges predecessors weight in-degree]]))
 
 (deftest t
@@ -18,7 +18,7 @@
   (for [e (edges g) :when (not (mirror-edge? e))] [(src e) (dest e)]))
 
 ;; why is this broken? doesn't seem to test ubergraph at all?
-#_
+
 (deftest simple-graph-test
   (let [g1 (graph [1 2] [1 3] [2 3] 4)
         g2 (graph {1 [2 3] 2 [3] 4 []})
@@ -60,7 +60,7 @@
                           #{1 2 3 4} (set (nodes (remove-edges g1 [1 2] [2 1] [1 3] [3 1])))
                           #{[2 3]} (set (vec-edges (remove-edges g1 [1 2] [2 1] [1 3] [3 1])))))))
 
-#_
+
 (deftest simple-digraph-test
   (let [g1 (digraph [1 2] [1 3] [2 3] 4)
         g2 (digraph {1 [2 3] 2 [3] 4 []})
@@ -112,7 +112,7 @@
                           #{[1 2]} (set (vec-edges (remove-nodes g1 3 4)))
                           #{1 2 3 4} (set (nodes (remove-edges g1 [1 2] [1 3])))
                           #{[2 3]} (set (vec-edges (remove-edges g1 [1 2] [1 3])))))))
-#_
+
 (deftest simple-weighted-graph-test
   (let [g1 (graph [1 2 77] [1 3 88] [2 3 99] 4)
         g2 (graph {1 {2 77 3 88} 2 {3 99} 4 []})
@@ -161,7 +161,7 @@
                           77 (weight g3 1 2)
                           1 (weight g4 6 5) ;This is different from Loom's behavior
                           1 (weight g4 7 8)))))
-#_
+
 (deftest simple-weighted-digraph-test
   (let [g1 (digraph [1 2 77] [1 3 88] [2 3 99] 4)
         g2 (digraph {1 {2 77 3 88} 2 {3 99} 4 []})
@@ -221,7 +221,7 @@
                           77 (weight g6 2 1)
                           88 (weight g4 6 5)
                           1 (weight g4 7 8)))))
-#_
+
 (deftest graph-with-self-cycles
   (let [g1 (graph [1 1])
         g2 (digraph [1 1])
@@ -268,7 +268,7 @@
                         g4 ug4
                         [true true false false] (map allow-parallel-edges? [ug1 ug2 ug3 ug4])
                         [true false true false] (map undirected-graph? [ug1 ug2 ug3 ug4]))))
-#_
+
 (deftest ubergraph-equality
   (are [expected got] (= expected got)
                       true (= (graph [1 2]) (graph [1 2]))
@@ -294,7 +294,7 @@
 (defn- make-edges [& args]
   (map (fn [[src dest]] {:src src :dest dest}) (partition 2 args)))
 
-#_
+
 (deftest find-edges-test
   (let [g0 (multidigraph)
         g1 (add-edges g0 [:a :b {:type "local"}])

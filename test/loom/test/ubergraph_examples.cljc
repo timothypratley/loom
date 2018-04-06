@@ -4,7 +4,6 @@
             [loom.graph :as lg]
             [loom.attr :as la]))
 
-#_#_#_#_#_#_#_
 (def graph1
   (uber/graph [:a :b] [:a :c] [:b :d]))
 
