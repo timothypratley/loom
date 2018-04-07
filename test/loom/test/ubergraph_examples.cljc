@@ -1,5 +1,6 @@
 (ns loom.test.ubergraph-examples
-  (:require [clojure.test :refer :all]
+  (:require [#?(:clj clojure.test :cljs cljs.test)
+             :refer (deftest is are testing)]
             [loom.ubergraph :as uber]
             [loom.graph :as lg]
             [loom.attr :as la]))

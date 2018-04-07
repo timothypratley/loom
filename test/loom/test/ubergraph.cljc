@@ -1,5 +1,6 @@
 (ns loom.test.ubergraph
-  (:require [clojure.test :refer :all]
+  (:require [#?(:clj clojure.test :cljs cljs.test)
+             :refer (deftest is are testing)]
             [loom.ubergraph
              :refer [mirror-edge? graph digraph multigraph multidigraph ubergraph
                      find-edges add-directed-edges

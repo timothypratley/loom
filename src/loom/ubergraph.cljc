@@ -2,7 +2,7 @@
   (:require [loom.graph :as lg]
             [loom.attr :as la]
             [clojure.string :as str]
-            [clojure.pprint]))
+            [#?(:clj clojure.pprint :cljs cljs.pprint) :as pprint]))
 
 ; NEW CONCEPTS
 
@@ -235,7 +235,9 @@ using path-between"
 
   clojure.lang.IPersistentMap
   (count [this] 5)
-  (assoc [this key value]
+
+  #?(:cljs IAssociative)
+  (#?(:cljs -assoc :clj assoc) [this key value]
     (case key
       :node-map (Ubergraph. value allow-parallel? undirected? attrs cached-hash)
       :allow-parallel? (Ubergraph. node-map value undirected? attrs cached-hash)
@@ -243,7 +245,7 @@ using path-between"
       :attrs (Ubergraph. node-map allow-parallel? undirected? value cached-hash)
       :cached-hash (Ubergraph. node-map allow-parallel? undirected? attrs value)
       this))
-  (containsKey [this item]
+  (#?(:cljs -contains-key? :clj containsKey) [this item]
     (contains? #{:node-map :allow-parallel? :undirected? :attrs :cached-hash} item))
   (seq [this]
     (seq {:node-map node-map
@@ -865,12 +867,12 @@ We're just checking the attributes here"
       (fn [g n]
         (la/add-attr g n :label (str (if (keyword? n) (name n) n)
                                      \newline
-                                     (escape-backslashes (with-out-str (clojure.pprint/pprint (la/attrs g n)))))))
+                                     (escape-backslashes (with-out-str (pprint/pprint (la/attrs g n)))))))
       $ (lg/nodes g))
     (reduce
       (fn [g e]
         (if (not (mirror-edge? e))
-          (la/add-attr g e :label (escape-backslashes (with-out-str (clojure.pprint/pprint (la/attrs g e)))))
+          (la/add-attr g e :label (escape-backslashes (with-out-str (pprint/pprint (la/attrs g e)))))
           g))
       $ (lg/edges g))))
 
