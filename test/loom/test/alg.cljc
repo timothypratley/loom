@@ -15,10 +15,9 @@
                               degeneracy-ordering maximal-cliques
                               subgraph? eql? isomorphism?]]
             [loom.derived :refer [mapped-by]]
-            clojure.walk
-            #?@(:clj [[clojure.test :refer :all]]
-                :cljs [cljs.test]))
-  #?@(:cljs [(:require-macros [cljs.test :refer (deftest testing are is)])]))
+            [clojure.walk]
+            #?(:clj [clojure.test :refer :all]
+               :cljs [cljs.test :refer (deftest testing are is)])))
 
 ;; http://en.wikipedia.org/wiki/Dijkstra's_algorithm
 (def g1
@@ -163,8 +162,7 @@
                               [:b :d 2]
                               [:c :d 3]
                               [:b :c 1]
-                              [:e :f 1]
-                             ))
+                              [:e :f 1]))
 
 (def mst_unweighted_g3 (graph [:a :b] [:a :c] [:a :d] [:b :d] [:c :d]))
 
@@ -180,15 +178,15 @@
                                [:e :f 10]
                                [:f :g 2]
                                [:i :h 7] [:i :g 6]
-                               [:h :g 1] ))
+                               [:h :g 1]))
 
 
 ;;graph with 2 components and 2 isolated nodes
 (def mst_wt_g7 (weighted-graph [:a :b 2]
                                [:b :d 2]
                                [:e :f 1]
-                               :g :h
-                             ))
+                               :g :h))
+
 
 (deftest depth-first-test
   (are [expected got] (= expected got)
@@ -214,7 +212,6 @@
        [:g :a :b :c :f :e :d] (topsort g5)
        nil (topsort g7)
        [5 6 7] (topsort g7 5)
-       
        [1 2 4] (topsort g15 1)))
 
 (deftest depth-first-test-2
@@ -234,7 +231,6 @@
        #{:r :o :b :g :p} (set (bf-traverse g2 :r :when #(< %3 3)))
        [:a :e :j] (bf-path g4 :a :j)
        [:a :c :h :j] (bf-path g4 :a :j :when (fn [n p d] (not= :e n)))
-       
        #?@(:clj [[:a :e :j] (bf-path-bi g4 :a :j)
                  true (some #(= % (bf-path-bi g5 :g :d)) [[:g :a :b :d] [:g :f :e :d]])])))
 
@@ -352,12 +348,10 @@
        true (dag? g5)
        [:a :c :h :j] (shortest-path g4 :a :j)
        [:a :e :j] (shortest-path (graph g4) :a :j)
-       #{9 10} (set (loners (add-nodes g8 9 10)))
-       ;; TODO: the rest
-       ))
+       #{9 10} (set (loners (add-nodes g8 9 10)))))
 
 (def INF #?(:clj Double/POSITIVE_INFINITY
-            :cljs Infinity))
+            :cljs js/Infinity))
 
 (deftest bellman-ford-test
   (are [expected graph start]
@@ -370,51 +364,51 @@
          :b INF
          :a INF
          :c 0}{:c [:c]}] g11 :c
-         false g11 :d
-         false g11 :e
-         [{:e 10,
-           :d 8,
-           :b 3,
-           :c 7,
-           :a 0}
-          {:a [:a],
-           :c [:a :b :c],
-           :b [:a :b],
-           :d [:a :b :d],
-           :e [:a :b :d :e]}] g12 :a
-           [{:e 7,
-             :d 5,
-             :c 4,
-             :a INF,
-             :b 0}
-            {:b [:b],
-             :c [:b :c],
-             :d [:b :d],
-             :e [:b :d :e]}] g12 :b
-             [{:e INF
-               :d INF
-               :b INF
-               :a INF
-               :c 0}
-              {:c [:c]}] g12 :c
-              [{:e 2,
-                :b -5,
-                :c -1,
-                :a INF,
-                :d 0}
-               {:d [:d],
-                :c [:d :e :b :c],
-                :b [:d :e :b],
-                :e [:d :e]}] g12 :d
-                [{:d -2,
-                  :b -7,
-                  :c -3,
-                  :a INF,
-                  :e 0}
-                 {:e [:e],
-                  :c [:e :b :c],
-                  :b [:e :b],
-                  :d [:e :b :d]}] g12 :e))
+       false g11 :d
+       false g11 :e
+       [{:e 10,
+         :d 8,
+         :b 3,
+         :c 7,
+         :a 0}
+        {:a [:a],
+         :c [:a :b :c],
+         :b [:a :b],
+         :d [:a :b :d],
+         :e [:a :b :d :e]}] g12 :a
+       [{:e 7,
+         :d 5,
+         :c 4,
+         :a INF,
+         :b 0}
+        {:b [:b],
+         :c [:b :c],
+         :d [:b :d],
+         :e [:b :d :e]}] g12 :b
+       [{:e INF
+         :d INF
+         :b INF
+         :a INF
+         :c 0}
+        {:c [:c]}] g12 :c
+       [{:e 2,
+         :b -5,
+         :c -1,
+         :a INF,
+         :d 0}
+        {:d [:d],
+         :c [:d :e :b :c],
+         :b [:d :e :b],
+         :e [:d :e]}] g12 :d
+       [{:d -2,
+         :b -7,
+         :c -3,
+         :a INF,
+         :e 0}
+        {:e [:e],
+         :c [:e :b :c],
+         :b [:e :b],
+         :d [:e :b :d]}] g12 :e))
 
 (deftest bipartite-test
   (are [expected got] (= expected got)
@@ -464,13 +458,11 @@
       [[:c :a 2] [:c :b 2]] (prim-mst-edges mst_wt_g5)
       [[:b :a 4] [:c :b 8] [:c :i 2] [:c :f 4] [:f :g 2]
        [:g :h 1] [:d :c 7] [:e :d 9]]  (prim-mst-edges mst_wt_g6))
-    
     (are [solutions result] (contains? solutions result)
       #{(edge-sets [[:d :a 1] [:b :d 2] [:c :b 1] [:e :f 1]])
         (edge-sets [[:d :a 1] [:a :b 2] [:c :b 1] [:e :f 1]])}
       (edge-sets (prim-mst-edges mst_wt_g2))
 
-      
       #{(edge-sets [[:c :a] [:d :b] [:c :d]])
         (edge-sets [[:a :b] [:a :c] [:a :d]])}
       (edge-sets (prim-mst-edges mst_unweighted_g3)))))
@@ -494,13 +486,13 @@
 
 ;;graph, with unreachable node
 (def astar-with-unreachable-target-g2 (graph [:a :b]
-                                              [:b :c]
-                                              [:d :e]))
+                                             [:b :c]
+                                             [:d :e]))
 
 (def astar-with-cycle-g3 (digraph [:a :b]
-                             [:b :c]
-                             [:c :d]
-                             [:d :a]))
+                                  [:b :c]
+                                  [:c :d]
+                                  [:d :a]))
 
 (def astar-weighted-graph-g4 (weighted-digraph [:a :b 10]
                                                [:b :c 20]
@@ -533,9 +525,7 @@
        3
        (astar-dist astar-with-cycle-g3 :a :d (fn [x y] 0))
        35
-       (astar-dist astar-weighted-graph-g4 :a :d (fn [x y] 0))
-       )
-  )
+       (astar-dist astar-weighted-graph-g4 :a :d (fn [x y] 0))))
 
 (deftest astar-visit-test
   (let [g (graph [0 1] [1 2] [2 3] [3 4])

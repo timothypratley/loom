@@ -279,23 +279,23 @@ in the search that produced this path.")
        (nth [e i notFound] (case i 0 src 1 dest 2 (la/attr (meta e) e :weight) notFound))]))
 
 
-#?(:clj
-   (extend-type
-     Object
-     MixedDirectionEdgeTests
-     (undirected-edge? [e] false)
-     (directed-edge? [e] false)
-     (mirror-edge? [e] false)
-     IUbergraph
-     (ubergraph? [g] (and (satisfies? lg/Graph g)
-                          (satisfies? lg/Digraph g)
-                          (satisfies? lg/WeightedGraph g)
-                          (satisfies? lg/EditableGraph g)
-                          (satisfies? la/AttrGraph g)
-                          (satisfies? Attrs g)
-                          (satisfies? UndirectedGraph g)
-                          (satisfies? QueryableGraph g)
-                          (satisfies? MixedDirectionGraph g)))))
+(extend-type
+  #?(:clj Object :cljs default)
+  MixedDirectionEdgeTests
+  (undirected-edge? [e] false)
+  (directed-edge? [e] false)
+  (mirror-edge? [e] false)
+  IUbergraph
+  (ubergraph? [g]
+    (and (satisfies? lg/Graph g)
+         (satisfies? lg/Digraph g)
+         (satisfies? lg/WeightedGraph g)
+         (satisfies? lg/EditableGraph g)
+         (satisfies? la/AttrGraph g)
+         (satisfies? Attrs g)
+         (satisfies? UndirectedGraph g)
+         (satisfies? QueryableGraph g)
+         (satisfies? MixedDirectionGraph g))))
 
 
 (defn edge?
@@ -304,11 +304,12 @@ in the search that produced this path.")
 
 (defn- get-edge [g n1 n2] (first (find-edges g n1 n2)))
 
+;; TODO: what about replacing a node?
 (defn- add-node
   [g node]
-  (cond
-    (get-in g [:node-map node]) g  ; node already exists
-    :else (assoc-in g [:node-map node] (->NodeInfo {} {} 0 0))))
+  (if (-> g (:node-map) (contains? node))
+    g
+    (assoc-in g [:node-map node] (->NodeInfo {} {} 0 0))))
 
 (defn- add-node-with-attrs
   "Adds node to g with a given attribute map. Takes a [node attribute-map] pair."
@@ -328,9 +329,9 @@ in the search that produced this path.")
 (defn- remove-node
   [g node]
   (-> g
-    (lg/remove-edges* (lg/out-edges g node))
-    (lg/remove-edges* (lg/in-edges g node))
-    (update-in [:node-map] dissoc node)))
+      (lg/remove-edges* (lg/out-edges g node))
+      (lg/remove-edges* (lg/in-edges g node))
+      (update-in [:node-map] dissoc node)))
 
 (def ^:private fconj (fnil conj #{}))
 (def ^:private finc (fnil inc 0))
@@ -443,11 +444,11 @@ in the search that produced this path.")
   (let [attributes (number->map attributes)]
     (cond
       (and (not (:allow-parallel? g)) (or (get-edge g src dest)
-                                       (get-edge g dest src)))
+                                          (get-edge g dest src)))
       (let [new-attrs (merge (la/attrs g src dest) (la/attrs g dest src) attributes)]
         (-> g
-          (lg/remove-edges* [[src dest] [dest src]])
-          (add-undirected-edge src dest attributes)))
+            (lg/remove-edges* [[src dest] [dest src]])
+            (add-undirected-edge src dest attributes)))
       :else (add-undirected-edge g src dest attributes))))
 
 (defn edge-description->edge
@@ -459,8 +460,8 @@ in the search that produced this path.")
   [g ed]
   (cond
     (edge? ed) ed
-    (not (vector? ed)) (throw (IllegalArgumentException.
-                                (str "Invalid edge description: " ed)))
+    (not (vector? ed)) (throw (ex-info (str "Invalid edge description: " ed)
+                                       {:type :illegal-argument}))
     (= (count ed) 2) (find-edge g (ed 0) (ed 1))
     (= (count ed) 3)
     (cond (number? (ed 2))
@@ -468,8 +469,8 @@ in the search that produced this path.")
           (map? (ed 2))
           (find-edge g (assoc (ed 2) :src (ed 0) :dest (ed 1)))
           :else
-          (throw (IllegalArgumentException.
-                   (str "Invalid edge description: " ed))))))
+          (throw (ex-info (str "Invalid edge description: " ed)
+                          {:type :illegal-argument})))))
 
 (defn- resolve-node-or-edge
   "Similar to edge-description->edge in that it converts edge descriptions to edge objects,
@@ -480,8 +481,9 @@ in the search that produced this path.")
         (lg/has-node? g node-or-edge) node-or-edge
         :else
         (try (:id (edge-description->edge g node-or-edge))
-          (catch IllegalArgumentException e
-            (throw (IllegalArgumentException. (str "Invalid node or edge description: " node-or-edge)))))))
+             (catch Exception e
+               (throw (ex-info (str "Invalid node or edge description: " node-or-edge)
+                               {:type :illegal-argument}))))))
 
 (defn- remove-edge
   [g edge]
@@ -491,21 +493,21 @@ in the search that produced this path.")
       (if-let
         [reverse-edge (other-direction g edge)]
         (-> g
-          (update-in [:attrs] dissoc id)
-          (update-in [:node-map src :out-edges dest] disj edge)
-          (update-in [:node-map src :in-edges dest] disj reverse-edge)
-          (update-in [:node-map src :in-degree] dec)
-          (update-in [:node-map src :out-degree] dec)
-          (update-in [:node-map dest :out-edges src] disj reverse-edge)
-          (update-in [:node-map dest :in-edges src] disj edge)
-          (update-in [:node-map dest :in-degree] dec)
-          (update-in [:node-map dest :out-degree] dec))
+            (update-in [:attrs] dissoc id)
+            (update-in [:node-map src :out-edges dest] disj edge)
+            (update-in [:node-map src :in-edges dest] disj reverse-edge)
+            (update-in [:node-map src :in-degree] dec)
+            (update-in [:node-map src :out-degree] dec)
+            (update-in [:node-map dest :out-edges src] disj reverse-edge)
+            (update-in [:node-map dest :in-edges src] disj edge)
+            (update-in [:node-map dest :in-degree] dec)
+            (update-in [:node-map dest :out-degree] dec))
         (-> g
-          (update-in [:attrs] dissoc id)
-          (update-in [:node-map src :out-edges dest] disj edge)
-          (update-in [:node-map src :out-degree] dec)
-          (update-in [:node-map dest :in-edges src] disj edge)
-          (update-in [:node-map dest :in-degree] dec)))
+            (update-in [:attrs] dissoc id)
+            (update-in [:node-map src :out-edges dest] disj edge)
+            (update-in [:node-map src :out-degree] dec)
+            (update-in [:node-map dest :in-edges src] disj edge)
+            (update-in [:node-map dest :in-degree] dec)))
       g)))
 
 (defn- swap-edge [edge]
@@ -606,7 +608,7 @@ in the search that produced this path.")
     (add-node-with-attrs g [(init 0) (init 1)])
 
     ;; edge description
-    (and (vector? init) (#{2,3} (count init)))
+    (and (vector? init) (#{2, 3} (count init)))
     (add-edge g [(init 0) (init 1) (number->map (get init 2))])
 
     ;; node
@@ -658,9 +660,9 @@ in the search that produced this path.")
    :undirected? (:undirected? g),
    :nodes (vec (for [node (lg/nodes g)] [node (la/attrs g node)]))
    :directed-edges (vec (for [edge (lg/edges g) :when (directed-edge? edge)]
-                             [(lg/src edge) (lg/dest edge) (la/attrs g edge)]))
+                          [(lg/src edge) (lg/dest edge) (la/attrs g edge)]))
    :undirected-edges (vec (for [edge (lg/edges g) :when (and (undirected-edge? edge) (not (mirror-edge? edge)))]
-                               [(lg/src edge) (lg/dest edge) (la/attrs g edge)]))})
+                            [(lg/src edge) (lg/dest edge) (la/attrs g edge)]))})
 
 (defn edn->ubergraph [{:keys [allow-parallel? undirected? nodes directed-edges undirected-edges]}]
   (-> (ubergraph allow-parallel? undirected?)
@@ -671,16 +673,16 @@ in the search that produced this path.")
 ;; Override print-dup so we can serialize to a string with (binding [*print-dup* true] (pr-str my-graph))
 ;; Deserialize from string with read-string.
 
-(defmethod print-dup loom.ubergraph.Ubergraph [o w]
-  (print-ctor o (fn [o w]
-                  (print-dup (:node-map o) w)
-                  (.write w " ")
-                  (print-dup (:allow-parallel? o) w)
-                  (.write w " ")
-                  (print-dup (:undirected? o) w)
-                  (.write w " ")
-                  (print-dup (:attrs o) w))
-                w))
+#_(defmethod print-dup loom.ubergraph.Ubergraph [o w]
+    (print-ctor o (fn [o w]
+                    (print-dup (:node-map o) w)
+                    (.write w " ")
+                    (print-dup (:allow-parallel? o) w)
+                    (.write w " ")
+                    (print-dup (:undirected? o) w)
+                    (.write w " ")
+                    (print-dup (:attrs o) w))
+                  w))
 
 ;; Friendlier printing
 
@@ -762,20 +764,20 @@ in the search that produced this path.")
 
 (defn- label [g]
   (as-> g $
-    (reduce
-      (fn [g n]
-        (la/add-attr g n :label (str (if (keyword? n) (name n) n)
-                                     \newline
-                                     (escape-backslashes (with-out-str (pprint/pprint (la/attrs g n)))))))
-      $
-      (lg/nodes g))
-    (reduce
-      (fn [g e]
-        (if (not (mirror-edge? e))
-          (la/add-attr g e :label (escape-backslashes (with-out-str (pprint/pprint (la/attrs g e)))))
-          g))
-      $
-      (lg/edges g))))
+        (reduce
+          (fn [g n]
+            (la/add-attr g n :label (str (if (keyword? n) (name n) n)
+                                         \newline
+                                         (escape-backslashes (with-out-str (pprint/pprint (la/attrs g n)))))))
+          $
+          (lg/nodes g))
+        (reduce
+          (fn [g e]
+            (if (not (mirror-edge? e))
+              (la/add-attr g e :label (escape-backslashes (with-out-str (pprint/pprint (la/attrs g e)))))
+              g))
+          $
+          (lg/edges g))))
 
 (defn- dotid [n]
   (if (or (string? n)
@@ -815,8 +817,8 @@ Additionally map can contain graph attributes for graphviz like :bgcolor, :label
                                (merge {:dir :none} (sanitize-attrs g e))])]
        (-> (concat [(merge {:layout layout} (dissoc opts :layout :save :auto-label))]
                    nodes directed-edges undirected-edges)
-         d/digraph
-         d/dot
-         (cond->
-           save (d/save! filename {:format format})
-           (not save) d/show!)))))
+           d/digraph
+           d/dot
+           (cond->
+             save (d/save! filename {:format format})
+             (not save) d/show!)))))
