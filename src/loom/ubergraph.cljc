@@ -246,9 +246,14 @@ in the search that produced this path.")
   (undirected-edge? [e] false)
   (directed-edge? [e] true)
   (mirror-edge? [e] false)
-  clojure.lang.Indexed
-  (nth [e i] (case i 0 src 1 dest 2 (la/attr (meta e) e :weight) nil))
-  (nth [e i notFound] (case i 0 src 1 dest 2 (la/attr (meta e) e :weight) notFound)))
+  #?@(:cljs
+      [IIndexed
+       (-nth [e i] (case i 0 src 1 dest 2 (la/attr (meta e) e :weight) nil))
+       (-nth [e i notFound] (case i 0 src 1 dest 2 (la/attr (meta e) e :weight) notFound))]
+      :clj
+      [clojure.lang.Indexed
+       (nth [e i] (case i 0 src 1 dest 2 (la/attr (meta e) e :weight) nil))
+       (nth [e i notFound] (case i 0 src 1 dest 2 (la/attr (meta e) e :weight) notFound))]))
 
 ; An UndirectedEdge stores an additional field that signals whether this was the
 ; original direction that was added to the graph, or the "mirror" edge that was
@@ -264,26 +269,33 @@ in the search that produced this path.")
   (undirected-edge? [e] true)
   (directed-edge? [e] false)
   (mirror-edge? [e] mirror?)
-  clojure.lang.Indexed
-  (nth [e i] (case i 0 src 1 dest 2 (la/attr (meta e) e :weight) nil))
-  (nth [e i notFound] (case i 0 src 1 dest 2 (la/attr (meta e) e :weight) notFound)))
+  #?@(:cljs
+      [IIndexed
+       (-nth [e i] (case i 0 src 1 dest 2 (la/attr (meta e) e :weight) nil))
+       (-nth [e i notFound] (case i 0 src 1 dest 2 (la/attr (meta e) e :weight) notFound))]
+      :clj
+      [clojure.lang.Indexed
+       (nth [e i] (case i 0 src 1 dest 2 (la/attr (meta e) e :weight) nil))
+       (nth [e i notFound] (case i 0 src 1 dest 2 (la/attr (meta e) e :weight) notFound))]))
 
-(extend-type
-  Object
-  MixedDirectionEdgeTests
-  (undirected-edge? [e] false)
-  (directed-edge? [e] false)
-  (mirror-edge? [e] false)
-  IUbergraph
-  (ubergraph? [g] (and (satisfies? lg/Graph g)
-                       (satisfies? lg/Digraph g)
-                       (satisfies? lg/WeightedGraph g)
-                       (satisfies? lg/EditableGraph g)
-                       (satisfies? la/AttrGraph g)
-                       (satisfies? Attrs g)
-                       (satisfies? UndirectedGraph g)
-                       (satisfies? QueryableGraph g)
-                       (satisfies? MixedDirectionGraph g))))
+
+#?(:clj
+   (extend-type
+     Object
+     MixedDirectionEdgeTests
+     (undirected-edge? [e] false)
+     (directed-edge? [e] false)
+     (mirror-edge? [e] false)
+     IUbergraph
+     (ubergraph? [g] (and (satisfies? lg/Graph g)
+                          (satisfies? lg/Digraph g)
+                          (satisfies? lg/WeightedGraph g)
+                          (satisfies? lg/EditableGraph g)
+                          (satisfies? la/AttrGraph g)
+                          (satisfies? Attrs g)
+                          (satisfies? UndirectedGraph g)
+                          (satisfies? QueryableGraph g)
+                          (satisfies? MixedDirectionGraph g)))))
 
 
 (defn edge?
