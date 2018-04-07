@@ -56,7 +56,8 @@
 
 ; Path protocols
 
-(defprotocol IPath "All the things you can do to a path"
+(defprotocol IPath
+  "All the things you can do to a path"
   (edges-in-path [path] "A list of edges comprising the path")
   (nodes-in-path [path] "A list of nodes comprising the path")
   (cost-of-path [path] "Returns the cost of the path with respect to the property that was minimized
@@ -64,12 +65,14 @@ in the search that produced this path.")
   (start-of-path [path] "Returns the first node in the path")
   (end-of-path [path] "Returns the last node in the path"))
 
-(defprotocol IAllPathsFromSource "An object that knows how to produce paths on demand from a given source,
-using path-to"
+(defprotocol IAllPathsFromSource
+  "An object that knows how to produce paths on demand from a given source,
+  using path-to"
   (path-to [paths dest] "The shortest path to dest"))
 
-(defprotocol IAllPaths "An object that knows how to produce paths on demand between any pair of nodes,
-using path-between"
+(defprotocol IAllPaths
+  "An object that knows how to produce paths on demand between any pair of nodes,
+  using path-between"
   (path-between [paths src dest] "The shortest path between src and dest"))
 
 ; Recognizing Ubergraphs
@@ -122,12 +125,12 @@ using path-between"
 
 ; These are the functions that are too lengthy to define inline
 ; in the Ubergraph record.
-(declare transpose-impl get-edge find-edges-impl find-edge-impl add-node add-edge remove-node remove-edge
+(declare transpose-impl get-edge find-edges-impl find-edge-impl
+         add-node add-edge remove-node remove-edge
          edge-description->edge resolve-node-or-edge
-         force-add-directed-edge force-add-undirected-edge
-         equal-graphs? hash-graph)
+         force-add-directed-edge force-add-undirected-edge)
 
-(deftype Ubergraph [node-map allow-parallel? undirected? attrs cached-hash]
+(defrecord Ubergraph [node-map allow-parallel? undirected? attrs]
   lg/Graph
   (nodes [g] (keys (:node-map g)))
   (edges [g] (for [[node node-info] (:node-map g)
@@ -158,7 +161,9 @@ using path-between"
   (add-edges* [g edge-definitions] (reduce (fn [g edge] (add-edge g edge)) g edge-definitions))
   (remove-nodes* [g nodes] (reduce remove-node g nodes))
   (remove-edges* [g edges] (reduce remove-edge g edges))
-  (remove-all [g] (Ubergraph. {} allow-parallel? undirected? {} (atom -1)))
+  (remove-all [g]
+    (assoc g :attrs {}
+             :node-map {}))
 
   la/AttrGraph
   (add-attr [g node-or-edge k v]
@@ -212,73 +217,16 @@ using path-between"
                                                       g edge-definitions))
 
   IUbergraph
-  (ubergraph? [g] true)
-
-  ;; get
-  clojure.lang.ILookup
-  (valAt [this key]
-    (case key
-      :node-map node-map
-      :allow-parallel? allow-parallel?
-      :undirected? undirected?
-      :attrs attrs
-      :cached-hash cached-hash
-      nil))
-  (valAt [this key default-value]
-    (case key
-      :node-map node-map
-      :allow-parallel? allow-parallel?
-      :undirected? undirected?
-      :attrs attrs
-      :cached-hash cached-hash
-      default-value))
-
-  clojure.lang.IPersistentMap
-  (count [this] 5)
-
-  #?(:cljs IAssociative)
-  (#?(:cljs -assoc :clj assoc) [this key value]
-    (case key
-      :node-map (Ubergraph. value allow-parallel? undirected? attrs cached-hash)
-      :allow-parallel? (Ubergraph. node-map value undirected? attrs cached-hash)
-      :undirected? (Ubergraph. node-map allow-parallel? value attrs cached-hash)
-      :attrs (Ubergraph. node-map allow-parallel? undirected? value cached-hash)
-      :cached-hash (Ubergraph. node-map allow-parallel? undirected? attrs value)
-      this))
-  (#?(:cljs -contains-key? :clj containsKey) [this item]
-    (contains? #{:node-map :allow-parallel? :undirected? :attrs :cached-hash} item))
-  (seq [this]
-    (seq {:node-map node-map
-          :allow-parallel? allow-parallel?
-          :undirected? undirected?
-          :attrs attrs
-          :cached-hash cached-hash}))
-
-  ;;dissoc
-  ;; TODO:
-  (without [this key] this)
-  ;; TODO:
-  ;;(hasheq [this] (hash-graph this))
-  (equiv [this other] (and (instance? Ubergraph other)
-                           (equal-graphs? this other)))
-
-
-  java.util.Map
-  (keySet [this] [:node-map :allow-parallel? :undirected? :attrs :cached-hash])
-
-  clojure.lang.IObj
-  (meta [this] nil)
-  (withMeta [this meta] this))
-
+  (ubergraph? [g] true))
 
 (defn undirected-graph? "If true, new edges in g are undirected by default.  If false,
-new edges in g are directed by default."
+  new edges in g are directed by default."
   [g] (:undirected? g))
 
 (defn allow-parallel-edges? "If true, two edges between the same pair of nodes in the same direction
-are permitted.  If false, adding a new edge between the same pair of nodes as an existing edge will
-merge the edges into a single edge, and adding an undirected edge on top of an existing directed edge
-will `upgrade' the directed edge to undirected and merge attributes."
+  are permitted.  If false, adding a new edge between the same pair of nodes as an existing edge will
+  merge the edges into a single edge, and adding an undirected edge on top of an existing directed edge
+  will `upgrade' the directed edge to undirected and merge attributes."
   [g] (:allow-parallel? g))
 
 ; A node-id is anything the user wants it to be -- a number, a keyword, a data structure
@@ -338,7 +286,8 @@ will `upgrade' the directed edge to undirected and merge attributes."
                        (satisfies? MixedDirectionGraph g))))
 
 
-(defn edge? "Tests whether o is an edge object"
+(defn edge?
+  "Tests whether o is an edge object"
   [o] (or (instance? Edge o) (instance? UndirectedEdge o)))
 
 (defn- get-edge [g n1 n2] (first (find-edges g n1 n2)))
@@ -375,7 +324,8 @@ will `upgrade' the directed edge to undirected and merge attributes."
 (def ^:private finc (fnil inc 0))
 
 (defn- submap? [m1 m2]
-  (every? identity (for [[k v] m1] (= (get m2 k) v))))
+  (every? identity (for [[k v] m1]
+                     (= (get m2 k) v))))
 
 (defn- find-edges-impl
   ([g src dest]
@@ -397,9 +347,10 @@ will `upgrade' the directed edge to undirected and merge attributes."
 (defn- find-edge-impl [& args]
   (first (apply find-edges-impl args)))
 
+;; TODO: don't really need value attribute
 (defn- add-directed-edge [g src dest attributes]
   (let [g (-> g (add-node src) (add-node dest))
-        edge-id (java.util.UUID/randomUUID)
+        edge-id [src dest (dissoc attributes :src dest)]
         edge (->Edge edge-id src dest)
         new-attrs (if attributes
                     (assoc (:attrs g) edge-id attributes)
@@ -408,20 +359,23 @@ will `upgrade' the directed edge to undirected and merge attributes."
         node-map-src (get node-map src)
         node-map-dest (get node-map dest)
         new-node-map-src (-> node-map-src
-                           (update-in [:out-edges dest] fconj edge)
-                           (update-in [:out-degree] finc))
+                             (update-in [:out-edges dest] fconj edge)
+                             (update-in [:out-degree] finc))
         new-node-map-dest (-> (if (= src dest) new-node-map-src node-map-dest)
-                            (update-in [:in-edges src] fconj edge)
-                            (update-in [:in-degree] finc))
+                              (update-in [:in-edges src] fconj edge)
+                              (update-in [:in-degree] finc))
         new-node-map (assoc node-map src new-node-map-src dest new-node-map-dest)]
-    (Ubergraph. new-node-map (:allow-parallel? g) (:undirected? g) new-attrs (atom -1))))
+    (assoc g :node-map new-node-map
+             :attrs new-attrs)))
 
 (defn- add-undirected-edge [g src dest attributes]
   (let [g (-> g (add-node src) (add-node dest))
-        forward-edge-id (java.util.UUID/randomUUID),
-        backward-edge-id forward-edge-id,
-        forward-edge (->UndirectedEdge forward-edge-id src dest false),
-        backward-edge (->UndirectedEdge backward-edge-id dest src true)
+        forward-edge-id (conj (vec (sort [src dest]))
+                              (dissoc attributes :src :dest))
+        backward-edge-id forward-edge-id
+        ;; TODO: don't store mirror, just return >
+        forward-edge (->UndirectedEdge forward-edge-id src dest (not= src (first forward-edge-id)))
+        backward-edge (->UndirectedEdge backward-edge-id dest src (= src (first forward-edge-id)))
         new-attrs (if attributes
                     (assoc (:attrs g) forward-edge-id attributes)
                     (:attrs g))
@@ -429,17 +383,18 @@ will `upgrade' the directed edge to undirected and merge attributes."
         node-map-src (get node-map src)
         node-map-dest (get node-map dest)
         new-node-map-src (-> node-map-src
-                           (update-in [:out-edges dest] fconj forward-edge)
-                           (update-in [:in-edges dest] fconj backward-edge)
-                           (update-in [:in-degree] finc)
-                           (update-in [:out-degree] finc))
+                             (update-in [:out-edges dest] fconj forward-edge)
+                             (update-in [:in-edges dest] fconj backward-edge)
+                             (update-in [:in-degree] finc)
+                             (update-in [:out-degree] finc))
         new-node-map-dest (-> (if (= src dest) new-node-map-src node-map-dest)
-                            (update-in [:out-edges src] fconj backward-edge)
-                            (update-in [:in-edges src] fconj forward-edge)
-                            (update-in [:in-degree] finc)
-                            (update-in [:out-degree] finc))
+                              (update-in [:out-edges src] fconj backward-edge)
+                              (update-in [:in-edges src] fconj forward-edge)
+                              (update-in [:in-degree] finc)
+                              (update-in [:out-degree] finc))
         new-node-map (assoc node-map src new-node-map-src dest new-node-map-dest)]
-    (Ubergraph. new-node-map (:allow-parallel? g) (:undirected? g) new-attrs (atom -1))))
+    (assoc g :node-map new-node-map
+             :attrs new-attrs)))
 
 (defn- number->map [n]
   (if (number? n) {:weight n} n))
@@ -485,10 +440,10 @@ will `upgrade' the directed edge to undirected and merge attributes."
 
 (defn edge-description->edge
   "Many ubergraph functions can take either an *edge description* (i.e., [src dest]
-[src dest weight] or [src dest attribute-map]) or an actual edge object.  This function
-is used to convert edge descriptions into an edge object, or passing through an edge
-object unchanged, so regardless of what you pass in, you're guaranteed to get out
-an edge object."
+  [src dest weight] or [src dest attribute-map]) or an actual edge object.  This function
+  is used to convert edge descriptions into an edge object, or passing through an edge
+  object unchanged, so regardless of what you pass in, you're guaranteed to get out
+  an edge object."
   [g ed]
   (cond
     (edge? ed) ed
@@ -506,8 +461,8 @@ an edge object."
 
 (defn- resolve-node-or-edge
   "Similar to edge-description->edge in that it converts edge descriptions to edge objects,
-but this function also passes nodes through unchanged, and extracts the edge id if
-it is an edge."
+  but this function also passes nodes through unchanged, and extracts the edge id if
+  it is an edge."
   [g node-or-edge]
   (cond (edge? node-or-edge) (:id node-or-edge)
         (lg/has-node? g node-or-edge) node-or-edge
@@ -544,17 +499,16 @@ it is an edge."
 (defn- swap-edge [edge]
   (assoc edge :src (:dest edge) :dest (:src edge)))
 
-(defn- transpose-impl [{:keys [node-map allow-parallel? undirected? attrs reverse-edges]}]
+(defn- transpose-impl [{:keys [node-map attrs] :as g}]
   (let [new-node-map
         (into {} (for [[node {:keys [in-edges out-edges in-degree out-degree]}] node-map
                        :let [new-in-edges (into {} (for [[k v] out-edges] [k (set (map swap-edge v))])),
                              new-out-edges (into {} (for [[k v] in-edges] [k (set (map swap-edge v))]))]]
                    [node (NodeInfo. new-out-edges new-in-edges in-degree out-degree)])),
-
         new-attrs (into {} (for [[o attr] attrs]
                              (if (edge? o) [(swap-edge o) attr] [o attr])))]
-
-    (Ubergraph. new-node-map allow-parallel? undirected? new-attrs (atom -1))))
+    (assoc g :node-map new-node-map
+             :attrs new-attrs)))
 
 (defn add-directed-edges
   "Adds directed edges, regardless of whether the underlying graph is directed or undirected"
@@ -661,29 +615,29 @@ it is an edge."
 (defn multigraph
   "Multigraph constructor. See build-graph for description of valid inits"
   [& inits]
-  (apply build-graph (->Ubergraph {} true true {} (atom -1)) inits))
+  (apply build-graph (->Ubergraph {} true true {}) inits))
 
 (defn multidigraph
   "Multidigraph constructor. See build-graph for description of valid inits"
   [& inits]
-  (apply build-graph (->Ubergraph {} true false {} (atom -1)) inits))
+  (apply build-graph (->Ubergraph {} true false {}) inits))
 
 (defn graph
   "Graph constructor. See build-graph for description of valid inits"
   [& inits]
-  (apply build-graph (->Ubergraph {} false true {} (atom -1)) inits))
+  (apply build-graph (->Ubergraph {} false true {}) inits))
 
 (defn digraph
   "Digraph constructor. See build-graph for description of valid inits"
   [& inits]
-  (apply build-graph (->Ubergraph {} false false {} (atom -1)) inits))
+  (apply build-graph (->Ubergraph {} false false {}) inits))
 
 (defn ubergraph
   "General ubergraph construtor. Takes booleans for allow-parallel? and undirected? to
-call either graph, digraph, multigraph, or multidigraph.
-See build-graph for description of valid inits"
+  call either graph, digraph, multigraph, or multidigraph.
+  See build-graph for description of valid inits"
   [allow-parallel? undirected? & inits]
-  (apply build-graph (->Ubergraph {} allow-parallel? undirected? {} (atom -1)) inits))
+  (apply build-graph (->Ubergraph {} allow-parallel? undirected? {}) inits))
 
 ;; Serialize/deserialize to an edn Clojure data structure
 
@@ -706,8 +660,15 @@ See build-graph for description of valid inits"
 ;; Deserialize from string with read-string.
 
 (defmethod print-dup loom.ubergraph.Ubergraph [o w]
-  (print-ctor o (fn [o w] (print-dup (:node-map o) w) (.write w " ") (print-dup (:allow-parallel? o) w) (.write w " ") (print-dup (:undirected? o) w) (.write w " ") (print-dup (:attrs o) w) (.write w " ")
-                  (print-ctor (:cached-hash o) (fn [o w] (print-dup (:cached-hash o) w)) w)) w))
+  (print-ctor o (fn [o w]
+                  (print-dup (:node-map o) w)
+                  (.write w " ")
+                  (print-dup (:allow-parallel? o) w)
+                  (.write w " ")
+                  (print-dup (:undirected? o) w)
+                  (.write w " ")
+                  (print-dup (:attrs o) w))
+                w))
 
 ;; Friendlier printing
 
@@ -718,19 +679,23 @@ See build-graph for description of valid inits"
     (:undirected? g) "Graph"
     :else "Digraph"))
 
-(defn count-nodes "Counts how many nodes are in g" [g]
+(defn count-nodes
+  "Counts how many nodes are in g"
+  [g]
   (if (instance? Ubergraph g)
     (count (:node-map g))
     (count (lg/nodes g))))
 
-(defn count-edges "Counts how many edges are in g.
-Undirected edges are counted twice, once for each direction."
+(defn count-edges
+  "Counts how many edges are in g.
+  Undirected edges are counted twice, once for each direction."
   [g]
   (apply + (for [node (lg/nodes g)]
              (lg/out-degree g node))))
 
-(defn count-unique-edges "Counts how many edges are in g.
-Undirected edges are counted only once."
+(defn count-unique-edges
+  "Counts how many edges are in g.
+  Undirected edges are counted only once."
   [g]
   (count (for [edge (lg/edges g)
                :when (not (mirror-edge? edge))]
@@ -764,84 +729,6 @@ Undirected edges are counted only once."
 (alter-meta! #'map->NodeInfo assoc :no-doc true)
 (alter-meta! #'map->UndirectedEdge assoc :no-doc true)
 
-;; Equality is more complicated
-;; We can't use Clojure's default structural equality because
-;; of the randomness of UUIDs.  The same graph, created at
-;; different points in time will have different UUIDs for the same edges
-;; so they won't compare as equal.
-;; We compare for equality by stripping out UUIDs and
-;; matching up edges between the same src and dest, with
-;; the same directedness and same attributes.
-
-(defn- edge-characteristics [g]
-  (fn [edge]
-    [(directed-edge? edge)
-     (la/attrs g edge)
-     (lg/src edge)
-     (lg/dest edge)]))
-
-(defn- equal-edges? [g1 g2 n1 n2]
-  (let [edges-between-g1 (find-edges g1 n1 n2),
-        edge-characteristics-g1 (frequencies (map (edge-characteristics g1) edges-between-g1))
-        edges-between-g2 (find-edges g2 n1 n2),
-        edge-characteristics-g2 (frequencies (map (edge-characteristics g2) edges-between-g2))]
-    (= edge-characteristics-g1 edge-characteristics-g2)))
-
-(defn- edges-freqs [g]
-  (frequencies (map (edge-characteristics g) (lg/edges g))))
-
-(defn- node-attrs [g]
-  (let [g-attrs (:attrs g)]
-    (if (pos? (count g-attrs)) ; only bother with this step if graph has attributes
-      (into {} (for [n (lg/nodes g) :let [a (get g-attrs n {})] :when (seq a)]
-                 [n a]))
-      {})))
-
-(defn- equal-nodes?
-  "Assumes that we've already established (= (nodes g1) (nodes g2)).
-We're just checking the attributes here"
-  [g1 g2]
-  (let [g1-attrs (:attrs g1), g2-attrs (:attrs g2)]
-    (if
-      (and (zero? (count g1-attrs))
-           (zero? (count g2-attrs)))
-      true
-      (every? identity
-              (for [n (lg/nodes g1)]
-                (= (get g1-attrs n {})
-                   (get g2-attrs n {})))))))
-
-(defn- node-set [^Ubergraph g]
-  (let [^java.util.Map m (:node-map g)]
-    (.keySet m)))
-
-(defn- equal-graphs? [^Ubergraph g1 ^Ubergraph g2]
-  (or (.equals g1 g2)
-      (and
-        (or
-          (= @(:cached-hash g1) -1)
-          (= @(:cached-hash g2) -1)
-          (= @(:cached-hash g1) @(:cached-hash g2)))
-        (= (count-nodes g1) (count-nodes g2))
-        (= (node-set g1) (node-set g2))
-        (= (count-edges g1) (count-edges g2))
-        (equal-nodes? g1 g2)
-        (every? identity
-                (for [node1 (lg/nodes g1),
-                      node2 (lg/successors g1 node1)]
-                  (equal-edges? g1 g2 node1 node2))))))
-
-(defn- hash-graph [g]
-  (let [h (:cached-hash g)
-        val @h]
-    (if (= val -1)
-      (let [ns (node-set g),
-            code (hash {:nodes ns,
-                        :node-attrs (node-attrs g),
-                        :edges (edges-freqs g)})]
-        (reset! h code)
-        code)
-      val)))
 
 ;; Visualization
 
@@ -868,13 +755,15 @@ We're just checking the attributes here"
         (la/add-attr g n :label (str (if (keyword? n) (name n) n)
                                      \newline
                                      (escape-backslashes (with-out-str (pprint/pprint (la/attrs g n)))))))
-      $ (lg/nodes g))
+      $
+      (lg/nodes g))
     (reduce
       (fn [g e]
         (if (not (mirror-edge? e))
           (la/add-attr g e :label (escape-backslashes (with-out-str (pprint/pprint (la/attrs g e)))))
           g))
-      $ (lg/edges g))))
+      $
+      (lg/edges g))))
 
 (defn- dotid [n]
   (if (or (string? n)

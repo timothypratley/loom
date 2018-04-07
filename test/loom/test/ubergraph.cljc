@@ -28,7 +28,7 @@
                           (set (nodes g3)) (set (nodes g1))
                           (set (nodes g3)) (set (nodes g1))
                           #{1 2 3 4 5 6 7 8 9} (set (nodes g4))
-                          #{[1 2][1 3][2 3] [5 6] [7 8]} (set (vec-edges g4))
+                          #{[1 2] [1 3] [2 3] [5 6] [7 8]} (set (vec-edges g4))
                           #{} (set (nodes g5))
                           #{} (set (edges g5))
                           true (has-node? g1 4)
@@ -153,7 +153,7 @@
                           77 (weight g1 1 2)
                           77 (weight g2 1 2)
                           77 (weight g3 1 2)
-                          1 (weight g4 6 5) ;This is different from Loom's behavior
+                          1 (weight g4 6 5)                 ;This is different from Loom's behavior
                           1 (weight g4 7 8)))))
 
 (deftest simple-weighted-digraph-test
@@ -264,20 +264,19 @@
                         [true false true false] (map undirected-graph? [ug1 ug2 ug3 ug4]))))
 
 (deftest ubergraph-equality
-  (are [expected got] (= expected got)
-                      true (= (graph [1 2]) (graph [1 2]))
-                      true (= (graph [1 2]) (graph [2 1]))
-                      false (= (graph [1 2]) (graph [1 3]))
-                      false (= (graph [1 2 {:a 1}]) (graph [1 2 {:a 2}]))
-                      true (= (graph [1 2 {:a 1}]) (graph [1 2 {:a 1}]))
-                      false (= (digraph [1 2 {:a 2}] [2 1 {:a 2}]) (graph [1 2 {:a 2}]))
-                      true (= (digraph [1 2 {:a 2}] [2 1 {:a 2}]) (digraph [1 2 {:a 2}] [2 1 {:a 2}]))
-                      true (= (multigraph [1 2 {:a 1}] [1 2 5])
-                              (multigraph [2 1 {:a 1}] [2 1 5]))
-                      false (= (multidigraph [1 2 {:a 1}] [1 2 5])
-                               (multidigraph [2 1 {:a 1}] [2 1 5]))
-                      true (= (digraph [0 1]) (digraph [0 1] [0 1]))
-                      true (= (digraph [0 1]) (add-directed-edges (digraph) [0 1] [0 1]))))
+  (is (= (graph [1 2]) (graph [1 2])))
+  (is (= (graph [1 2]) (graph [2 1])))
+  (is (not= (graph [1 2]) (graph [1 3])))
+  (is (not= (graph [1 2 {:a 1}]) (graph [1 2 {:a 2}])))
+  (is (= (graph [1 2 {:a 1}]) (graph [1 2 {:a 1}])))
+  (is (not= (digraph [1 2 {:a 2}] [2 1 {:a 2}]) (graph [1 2 {:a 2}])))
+  (is (= (digraph [1 2 {:a 2}] [2 1 {:a 2}]) (digraph [1 2 {:a 2}] [2 1 {:a 2}])))
+  (is (= (multigraph [1 2 {:a 1}] [1 2 5])
+         (multigraph [2 1 {:a 1}] [2 1 5])))
+  (is (not= (multidigraph [1 2 {:a 1}] [1 2 5])
+           (multidigraph [2 1 {:a 1}] [2 1 5])))
+  (is (= (digraph [0 1]) (digraph [0 1] [0 1])))
+  (is (= (digraph [0 1]) (add-directed-edges (digraph) [0 1] [0 1]))))
 
 (defn- sorted-simple-edges [xs]
   (sort-by (juxt :src :dest) (map (fn [x] {:src (:src x) :dest (:dest x)}) xs)))
@@ -286,17 +285,20 @@
   (sorted-simple-edges (find-edges g query)))
 
 (defn- make-edges [& args]
-  (map (fn [[src dest]] {:src src :dest dest}) (partition 2 args)))
+  (map (fn [[src dest]]
+         {:src src :dest dest})
+       (partition 2 args)))
 
 
 (deftest find-edges-test
   (let [g0 (multidigraph)
         g1 (add-edges g0 [:a :b {:type "local"}])
-        g2 (add-edges g1 [:a :b {:type "local"}])
+        g2 (add-edges g1 [:a :b {:type "local" :color "red"}])
         g3 (add-edges g2 [:a :b {:type "global"}])
         g4 (add-edges g3 [:x :y {:type "global"}])
         g5 (add-edges g4 [:a :y {:type "global"}])
-        g6 (add-edges g5 [:x :y {:type "global" :position 5}])]
+        g6 (add-edges g5 [:x :y {:type "global" :position 5}])
+        g7 (add-edges g6 [:x :y {:type "global" :position 5}])]
 
     (testing "finds edges by attribute"
       (is (= (make-edges :a :b)
@@ -318,4 +320,6 @@
       (is (= (make-edges :x :y)
              (do-find-edges g6 {:position 5})))
       (is (= (make-edges :x :y)
-             (do-find-edges g6 {:type "global" :position 5}))))))
+             (do-find-edges g6 {:type "global" :position 5})))
+      (is (= (make-edges :x :y)
+             (do-find-edges g7 {:type "global" :position 5}))))))

@@ -18,7 +18,7 @@
 (def graph4
   (uber/add-directed-edges graph2 [:a :d 8]))
 
-
+#_#_#_
 (deftest test-equal-graphs?
   (are [x y] (= x y)
        (uber/graph [:a :b] [:a :c] [:b :d]) (uber/graph [:a :b] [:a :c] [:b :d])
